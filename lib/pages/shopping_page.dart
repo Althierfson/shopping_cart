@@ -1,46 +1,58 @@
-import 'package:carrinho_de_compra/container.dart';
-import 'package:carrinho_de_compra/models/cart.dart';
-import 'package:carrinho_de_compra/models/item.dart';
-import 'package:carrinho_de_compra/repositories/data_repository.dart';
-import 'package:carrinho_de_compra/theme.dart';
-import 'package:carrinho_de_compra/widgets/item_tile.dart';
-import 'package:carrinho_de_compra/widgets/user_clip.dart';
+import 'package:mobx/mobx.dart';
+import 'package:wishlist/container.dart';
+import 'package:wishlist/models/item.dart';
+import 'package:wishlist/models/wishlist.dart';
+import 'package:wishlist/state_manege/shopping_store/shopping_store.dart';
+import 'package:wishlist/theme.dart';
+import 'package:wishlist/util/store_state.dart';
+import 'package:wishlist/widgets/item_tile.dart';
+import 'package:wishlist/widgets/user_clip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 
 class ShoppingPage extends StatefulWidget {
-  final Cart cart;
-  const ShoppingPage({super.key, required this.cart});
+  final Wishlist wishlist;
+  const ShoppingPage({super.key, required this.wishlist});
 
   @override
   State<ShoppingPage> createState() => _ShoppingPageState();
 }
 
 class _ShoppingPageState extends State<ShoppingPage> {
-  late DataRepository dataRepository;
-  late Future<List<Item>> _taskGetItems;
-  late Cart cart;
-
-  String _query = "";
-  int? _sortSelected = 0;
-
-  List<String> options = ["Standard", "Expensive", "Cheaper"];
-  Map<int, String> sortToString = {1: 'DESC', 2: 'ASC'};
-  Map<int, int> amountCached = {};
-  int itemSelected = -1;
+  late ShoppingStore _shoppingStore;
+  late Wishlist wishlist;
+  late List<ReactionDisposer> _disposers;
 
   @override
   void initState() {
-    cart = widget.cart;
-    dataRepository = sl();
-    getItems();
+    getDependicies();
+    makeReaction();
     super.initState();
   }
 
-  getItems() {
-    amountCached = {};
-    itemSelected = -1;
-    _taskGetItems = dataRepository.getAllItems(
-        contains: _query, sort: sortToString[_sortSelected]);
+  void getDependicies() {
+    _shoppingStore = sl();
+    _shoppingStore.wishlist = widget.wishlist;
+    wishlist = widget.wishlist;
+    _shoppingStore.getItems();
+  }
+
+  void makeReaction() {
+    _disposers = [
+      reaction((_) => _shoppingStore.snackMsg, (String? error) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error ?? "")));
+      }),
+    ];
+  }
+
+  @override
+  void dispose() {
+    for (var n in _disposers) {
+      n();
+    }
+    super.dispose();
   }
 
   @override
@@ -65,11 +77,15 @@ class _ShoppingPageState extends State<ShoppingPage> {
                   SizedBox(
                       width: 50,
                       height: 50,
-                      child: UserIconClip(iconpath: cart.icon ?? "")),
+                      child: GestureDetector(
+                          onTap: () {
+                            _shoppingStore.goToWishlist();
+                          },
+                          child: UserIconClip(iconpath: wishlist.icon ?? ""))),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Text(
-                      cart.name ?? "",
+                      wishlist.name ?? "",
                       style: TextStyle(color: CColors.white, fontSize: 16),
                     ),
                   )
@@ -92,8 +108,8 @@ class _ShoppingPageState extends State<ShoppingPage> {
                           )),
                       onChanged: (value) {
                         setState(() {
-                          _query = value;
-                          getItems();
+                          _shoppingStore.query = value;
+                          _shoppingStore.getItems();
                         });
                       },
                     ),
@@ -116,21 +132,19 @@ class _ShoppingPageState extends State<ShoppingPage> {
                 ],
               ),
             ),
-            FutureBuilder(
-                future: _taskGetItems,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
+            Observer(builder: (context) {
+              if (_shoppingStore.state == StoreState.loading) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
 
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    return _buildItemList(snapshot.data ?? []);
-                  }
+              if (_shoppingStore.state == StoreState.loaded) {
+                return _buildItemList(_shoppingStore.itemList);
+              }
 
-                  return Container();
-                })
+              return Container();
+            })
           ],
         ),
       ),
@@ -144,54 +158,19 @@ class _ShoppingPageState extends State<ShoppingPage> {
         itemCount: items.length,
         itemBuilder: (context, index) => Padding(
           padding: const EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
-          child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  itemSelected = index;
-                });
+          child: Observer(builder: (context) {
+            return ItemTile(
+              item: items[index],
+              onWishlist: _shoppingStore.isInWishlist(items[index].id ?? -1),
+              isLoading: _shoppingStore.itemState == items[index].id,
+              onAddBottomTap: (value) {
+                _shoppingStore.updateWishlist(items[index].id ?? -1, value);
               },
-              child: Column(
-                children: [
-                  ItemTile(
-                    item: items[index],
-                    isShow: itemSelected == index,
-                    itemAmount: amountCached[index] ?? 0,
-                    onAmountItemChange: (value) {
-                      changeamountCached(index, value);
-                    },
-                    onAddBottomTap: () {
-                      addOnCart(items, index);
-                    },
-                  ),
-                ],
-              )),
+            );
+          }),
         ),
       ),
     );
-  }
-
-  void addOnCart(List<Item> items, int index) {
-    if (amountCached[index] == null || amountCached[index] == 0) return;
-
-    dataRepository.addOnCart(
-        idItem: items[index].id ?? 0,
-        idCart: cart.id ?? 0,
-        amount: amountCached[index]!);
-
-    amountCached[index] = 0;
-    itemSelected = -1;
-    setState(() {});
-  }
-
-  void changeamountCached(int index, int value) {
-    if (amountCached[index] != null) {
-      amountCached[index] = amountCached[index]! + value;
-    } else {
-      amountCached[index] = value;
-    }
-
-    if (amountCached[index]! < 0) amountCached[index] = 0;
-    setState(() {});
   }
 
   void _showSortOpctions() {
@@ -216,7 +195,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
                 Expanded(
                   child: ListView(
                       children: List.generate(
-                    options.length,
+                    _shoppingStore.sortOptionsKeys.length,
                     (index) => Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -225,18 +204,20 @@ class _ShoppingPageState extends State<ShoppingPage> {
                                 onTap: () {
                                   sheetSetState(
                                     () {
-                                      _sortSelected = index;
+                                      _shoppingStore.sortSelected =
+                                          _shoppingStore.sortOptionsKeys[index];
                                     },
                                   );
                                 },
-                                child: Text(options[index]))),
+                                child: Text(
+                                    _shoppingStore.sortOptionsKeys[index]))),
                         Radio(
-                            value: index,
-                            groupValue: _sortSelected,
+                            value: _shoppingStore.sortOptionsKeys[index],
+                            groupValue: _shoppingStore.sortSelected,
                             onChanged: (value) {
                               sheetSetState(
                                 () {
-                                  _sortSelected = value;
+                                  _shoppingStore.sortSelected = value;
                                 },
                               );
                             }),
@@ -256,7 +237,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
       ),
     ).then((value) {
       setState(() {
-        getItems();
+        _shoppingStore.getItems();
       });
     });
   }

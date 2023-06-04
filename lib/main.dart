@@ -1,5 +1,5 @@
-import 'package:carrinho_de_compra/container.dart';
-import 'package:carrinho_de_compra/pages/home_page.dart';
+import 'package:wishlist/container.dart';
+import 'package:wishlist/pages/home_page.dart';
 import 'package:flutter/material.dart';
 
 void main() async {
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Carrinho',
+      title: 'Wishlist',
       home: HomePage(),
     );
   }

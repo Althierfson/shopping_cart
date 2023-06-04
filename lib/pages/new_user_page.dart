@@ -1,9 +1,11 @@
-import 'package:carrinho_de_compra/models/user.dart';
-import 'package:carrinho_de_compra/pages/cart_list_page.dart';
-import 'package:carrinho_de_compra/repositories/assets_repository.dart';
-import 'package:carrinho_de_compra/repositories/data_repository.dart';
-import 'package:carrinho_de_compra/widgets/user_clip.dart';
+import 'package:wishlist/models/user.dart';
+import 'package:wishlist/pages/wishlist_list_page.dart';
+import 'package:wishlist/state_manege/new_user_store/new_user_store.dart';
+import 'package:wishlist/util/custom_assets.dart';
+import 'package:wishlist/widgets/user_clip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:mobx/mobx.dart';
 
 import '../container.dart';
 import '../theme.dart';
@@ -16,18 +18,33 @@ class NewUserPage extends StatefulWidget {
 }
 
 class _NewUserPageState extends State<NewUserPage> {
-  late AssetsRepository assetsRepository;
-  late DataRepository dataRepository;
-  String userIconSelected = "assets/user_icons/1.jpg";
-  String userName = "";
-
-  var inputError = false;
+  late NewUserStore _newUserStore;
+  late List<ReactionDisposer> _disposers;
 
   @override
   void initState() {
-    assetsRepository = sl();
-    dataRepository = sl();
+    getDependecies();
     super.initState();
+  }
+
+  getDependecies() async {
+    _newUserStore = sl();
+    _disposers = [
+      reaction((_) => _newUserStore.inputError, (String? error) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error ?? "")));
+      }),
+      reaction((_) => _newUserStore.user, (User? user) {
+        if (user != null) goToCartListPage(user);
+      })
+    ];
+  }
+
+  @override
+  void dispose() {
+    // ignore: avoid_function_literals_in_foreach_calls
+    _disposers.forEach((r) => r());
+    super.dispose();
   }
 
   @override
@@ -63,26 +80,31 @@ class _NewUserPageState extends State<NewUserPage> {
               child: SizedBox(
                   height: 100,
                   width: 100,
-                  child: UserIconClip(iconpath: userIconSelected)),
+                  child: Observer(
+                      builder: (_) => UserIconClip(
+                          iconpath: _newUserStore.userIconSelected))),
             ),
-            TextField(
-              textAlign: TextAlign.center,
-              cursorColor: CColors.white,
-              style: TextStyle(color: CColors.white),
-              decoration: InputDecoration(
-                  errorText: inputError ? "Name can't be empty" : null,
-                  hintText: "Name",
-                  alignLabelWithHint: true,
-                  hintStyle: TextStyle(
-                    color: CColors.white,
-                  ),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: CColors.white),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: CColors.white),
-                  )),
-              onChanged: (value) => userName = value,
+            Observer(
+              builder: (_) => TextField(
+                controller: TextEditingController(text: _newUserStore.userName),
+                textAlign: TextAlign.center,
+                cursorColor: CColors.white,
+                style: TextStyle(color: CColors.white),
+                decoration: InputDecoration(
+                    errorText: _newUserStore.inputError,
+                    hintText: "Name",
+                    alignLabelWithHint: true,
+                    hintStyle: TextStyle(
+                      color: CColors.white,
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: CColors.white),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: CColors.white),
+                    )),
+                onChanged: (value) => _newUserStore.userName = value,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.only(top: 40.0),
@@ -90,7 +112,7 @@ class _NewUserPageState extends State<NewUserPage> {
                   style:
                       ElevatedButton.styleFrom(backgroundColor: CColors.blue),
                   onPressed: () {
-                    _createNewUser();
+                    _newUserStore.createNewUser();
                   },
                   icon: Icon(
                     Icons.open_in_new_outlined,
@@ -108,7 +130,7 @@ class _NewUserPageState extends State<NewUserPage> {
   }
 
   void _buildSelectUserIcon() {
-    List<String> iconsList = assetsRepository.userIcons;
+    List<String> iconsList = CustomAssets.userIcons;
 
     showModalBottomSheet(
       context: context,
@@ -144,7 +166,8 @@ class _NewUserPageState extends State<NewUserPage> {
                             iconsList.length,
                             (index) => GestureDetector(
                                   onTap: () {
-                                    userIconSelected = iconsList[index];
+                                    _newUserStore.userIconSelected =
+                                        iconsList[index];
                                     bottomSheetSetState(() {});
                                     setState(() {});
                                   },
@@ -159,7 +182,8 @@ class _NewUserPageState extends State<NewUserPage> {
                                             Container(
                                               width: 100,
                                               height: 100,
-                                              decoration: userIconSelected ==
+                                              decoration: _newUserStore
+                                                          .userIconSelected ==
                                                       iconsList[index]
                                                   ? BoxDecoration(
                                                       boxShadow: const [
@@ -175,7 +199,8 @@ class _NewUserPageState extends State<NewUserPage> {
                                               child: UserIconClip(
                                                   iconpath: iconsList[index]),
                                             ),
-                                            userIconSelected == iconsList[index]
+                                            _newUserStore.userIconSelected ==
+                                                    iconsList[index]
                                                 ? const Icon(
                                                     Icons.verified,
                                                     color: Colors.green,
@@ -203,18 +228,6 @@ class _NewUserPageState extends State<NewUserPage> {
     );
   }
 
-  void _createNewUser() async {
-    if (userName.isEmpty) {
-      setState(() {
-        inputError = true;
-      });
-    } else {
-      final newUser = await dataRepository
-          .createNewUser(User(icon: userIconSelected, name: userName));
-      goToCartListPage(newUser);
-    }
-  }
-
   goToCartListPage(User newUser) => Navigator.pushReplacement(
-      context, MaterialPageRoute(builder: (_) => CartListPage(user: newUser)));
+      context, MaterialPageRoute(builder: (_) => WishlistListPage(user: newUser)));
 }

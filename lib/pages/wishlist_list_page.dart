@@ -1,41 +1,33 @@
-import 'package:carrinho_de_compra/models/cart.dart';
-import 'package:carrinho_de_compra/models/user.dart';
-import 'package:carrinho_de_compra/pages/new_cart_page.dart';
-import 'package:carrinho_de_compra/pages/shopping_page.dart';
-import 'package:carrinho_de_compra/repositories/data_repository.dart';
-import 'package:carrinho_de_compra/theme.dart';
-import 'package:carrinho_de_compra/widgets/user_clip.dart';
+import 'package:wishlist/models/user.dart';
+import 'package:wishlist/models/wishlist.dart';
+import 'package:wishlist/pages/new_wishlist_page.dart';
+import 'package:wishlist/pages/shopping_page.dart';
+import 'package:wishlist/state_manege/wishlist_list_store/wishlist_list_store.dart';
+import 'package:wishlist/theme.dart';
+import 'package:wishlist/widgets/user_clip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 
 import '../container.dart';
 
-class CartListPage extends StatefulWidget {
+class WishlistListPage extends StatefulWidget {
   final User user;
-  const CartListPage({super.key, required this.user});
+  const WishlistListPage({super.key, required this.user});
 
   @override
-  State<CartListPage> createState() => _CartListPageState();
+  State<WishlistListPage> createState() => _WishlistListPageState();
 }
 
-class _CartListPageState extends State<CartListPage> {
-  late DataRepository repository;
-  late User user;
-  late Future<List<Cart>> _taskGetCart;
-
-  String newCart = "";
-
-  double amountOfAllCart = 0.0;
+class _WishlistListPageState extends State<WishlistListPage> {
+  late WishlistListStore _cartListStore;
+  late User _user;
 
   @override
   void initState() {
-    user = widget.user;
-    repository = sl();
-    _taskGetCart = getCarts();
+    _user = widget.user;
+    _cartListStore = sl();
+    _cartListStore.init(_user.id ?? 0);
     super.initState();
-  }
-
-  Future<List<Cart>> getCarts() {
-    return repository.getAllUserCart('${widget.user.id}');
   }
 
   @override
@@ -67,22 +59,24 @@ class _CartListPageState extends State<CartListPage> {
                     child: SizedBox(
                         height: 100,
                         width: 100,
-                        child: UserIconClip(iconpath: user.icon ?? "")),
+                        child: UserIconClip(iconpath: _user.icon ?? "")),
                   ),
                   Text(
-                    user.name ?? "",
+                    _user.name ?? "",
                     style: TextStyle(
                         color: CColors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold),
                   ),
-                  Text(
-                    '\$ ${amountOfAllCart.toStringAsFixed(2)}',
-                    style: TextStyle(
-                        color: CColors.red,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold),
-                  )
+                  Observer(builder: (context) {
+                    return Text(
+                      '\$ ${_cartListStore.amountOfAllCart}',
+                      style: TextStyle(
+                          color: CColors.red,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold),
+                    );
+                  })
                 ],
               ),
             ),
@@ -93,7 +87,7 @@ class _CartListPageState extends State<CartListPage> {
                 children: [
                   TextButton.icon(
                     onPressed: () {
-                      _taskGetCart = getCarts();
+                      _cartListStore.getUserCart(_user.id ?? 0);
                     },
                     icon: Icon(
                       Icons.refresh,
@@ -109,7 +103,7 @@ class _CartListPageState extends State<CartListPage> {
                       Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => NewCartPage(user: user)));
+                              builder: (_) => NewWishlistPage(user: _user)));
                     },
                     icon: Icon(
                       Icons.add_shopping_cart,
@@ -123,21 +117,8 @@ class _CartListPageState extends State<CartListPage> {
                 ],
               ),
             ),
-            FutureBuilder<List<Cart>>(
-              future: _taskGetCart,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return _buildList(snapshot.data ?? []);
-                }
-
-                return Container();
-              },
+            Observer(
+              builder: (context) => _buildList(_cartListStore.userCartList),
             ),
           ],
         ),
@@ -145,9 +126,7 @@ class _CartListPageState extends State<CartListPage> {
     );
   }
 
-  Widget _buildList(List<Cart> data) {
-    setAmountOfAllCart(data);
-
+  Widget _buildList(List<Wishlist> data) {
     if (data.isEmpty) {
       return _buildEmptyCart();
     }
@@ -163,7 +142,7 @@ class _CartListPageState extends State<CartListPage> {
                           context,
                           MaterialPageRoute(
                               builder: (_) => ShoppingPage(
-                                    cart: data[index],
+                                    wishlist: data[index],
                                   )));
                     },
                     child: Container(
@@ -196,14 +175,6 @@ class _CartListPageState extends State<CartListPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 15.0),
-                                child: Text(
-                                  '${data[index].itemsAmount.length} Items',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              )
                             ],
                           )
                         ],
@@ -211,19 +182,6 @@ class _CartListPageState extends State<CartListPage> {
                     ),
                   ),
                 )));
-  }
-
-  void setAmountOfAllCart(List<Cart> data) {
-    double value = 0.0;
-    for (var n in data) {
-      value = value + n.cartAmount;
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        amountOfAllCart = value;
-      });
-    });
   }
 
   Widget _buildEmptyCart() {

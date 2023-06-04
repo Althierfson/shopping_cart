@@ -1,36 +1,51 @@
-import 'package:carrinho_de_compra/container.dart';
-import 'package:carrinho_de_compra/models/cart.dart';
-import 'package:carrinho_de_compra/models/user.dart';
-import 'package:carrinho_de_compra/pages/cart_page.dart';
-import 'package:carrinho_de_compra/repositories/assets_repository.dart';
-import 'package:carrinho_de_compra/repositories/data_repository.dart';
-import 'package:carrinho_de_compra/theme.dart';
-import 'package:carrinho_de_compra/widgets/user_clip.dart';
+import 'package:wishlist/container.dart';
+import 'package:wishlist/models/user.dart';
+import 'package:wishlist/models/wishlist.dart';
+import 'package:wishlist/pages/wishlist_list_page.dart';
+import 'package:wishlist/state_manege/new_wishlist_store/new_wishlist_store.dart';
+import 'package:wishlist/theme.dart';
+import 'package:wishlist/util/custom_assets.dart';
+import 'package:wishlist/widgets/user_clip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:mobx/mobx.dart';
 
-class NewCartPage extends StatefulWidget {
+class NewWishlistPage extends StatefulWidget {
   final User user;
-  const NewCartPage({super.key, required this.user});
+  const NewWishlistPage({super.key, required this.user});
 
   @override
-  State<NewCartPage> createState() => _NewCartPageState();
+  State<NewWishlistPage> createState() => _NewWishlistPageState();
 }
 
-class _NewCartPageState extends State<NewCartPage> {
-  late DataRepository dataRepository;
-  late AssetsRepository assetsRepository;
-  late User user;
-
-  String cartIconSelected = "assets/cart_icons/0.jpg";
-  String cartName = "";
-  bool inputError = false;
+class _NewWishlistPageState extends State<NewWishlistPage> {
+  late NewWishlistStore _newWishlistStore;
+  late List<ReactionDisposer> _disposers;
 
   @override
   void initState() {
-    user = widget.user;
-    dataRepository = sl();
-    assetsRepository = sl();
+    getDependecies();
     super.initState();
+  }
+
+  getDependecies() async {
+    _newWishlistStore = sl();
+    _disposers = [
+      reaction((_) => _newWishlistStore.inputError, (String? error) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error ?? "")));
+      }),
+      reaction((_) => _newWishlistStore.wishlist, (Wishlist? cart) {
+        if (cart != null) backToCartList();
+      })
+    ];
+  }
+
+  @override
+  void dispose() {
+    // ignore: avoid_function_literals_in_foreach_calls
+    _disposers.forEach((r) => r());
+    super.dispose();
   }
 
   @override
@@ -66,26 +81,31 @@ class _NewCartPageState extends State<NewCartPage> {
               child: SizedBox(
                   height: 100,
                   width: 100,
-                  child: UserIconClip(iconpath: cartIconSelected)),
+                  child: UserIconClip(
+                      iconpath: _newWishlistStore.wishlistIconSelected)),
             ),
-            TextField(
-              textAlign: TextAlign.center,
-              cursorColor: CColors.white,
-              style: TextStyle(color: CColors.white),
-              decoration: InputDecoration(
-                  errorText: inputError ? "Name can't be empty" : null,
-                  hintText: "Name",
-                  alignLabelWithHint: true,
-                  hintStyle: TextStyle(
-                    color: CColors.white,
-                  ),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: CColors.white),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: CColors.white),
-                  )),
-              onChanged: (value) => cartName = value,
+            Observer(
+              builder: (_) => TextField(
+                controller:
+                    TextEditingController(text: _newWishlistStore.wishlistName),
+                textAlign: TextAlign.center,
+                cursorColor: CColors.white,
+                style: TextStyle(color: CColors.white),
+                decoration: InputDecoration(
+                    errorText: _newWishlistStore.inputError,
+                    hintText: "Name",
+                    alignLabelWithHint: true,
+                    hintStyle: TextStyle(
+                      color: CColors.white,
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: CColors.white),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: CColors.white),
+                    )),
+                onChanged: (value) => _newWishlistStore.wishlistName = value,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.only(top: 40.0),
@@ -93,7 +113,7 @@ class _NewCartPageState extends State<NewCartPage> {
                   style:
                       ElevatedButton.styleFrom(backgroundColor: CColors.blue),
                   onPressed: () {
-                    _createNewCart();
+                    _newWishlistStore.createNewWishlist(widget.user.id ?? 0);
                   },
                   icon: Icon(
                     Icons.open_in_new_outlined,
@@ -111,7 +131,7 @@ class _NewCartPageState extends State<NewCartPage> {
   }
 
   void _buildSelectUserIcon() {
-    List<String> iconsList = assetsRepository.cartIcons;
+    List<String> iconsList = CustomAssets.cartIcons;
 
     showModalBottomSheet(
       context: context,
@@ -147,7 +167,8 @@ class _NewCartPageState extends State<NewCartPage> {
                             iconsList.length,
                             (index) => GestureDetector(
                                   onTap: () {
-                                    cartIconSelected = iconsList[index];
+                                    _newWishlistStore.wishlistIconSelected =
+                                        iconsList[index];
                                     bottomSheetSetState(() {});
                                     setState(() {});
                                   },
@@ -162,7 +183,8 @@ class _NewCartPageState extends State<NewCartPage> {
                                             Container(
                                               width: 100,
                                               height: 100,
-                                              decoration: cartIconSelected ==
+                                              decoration: _newWishlistStore
+                                                          .wishlistIconSelected ==
                                                       iconsList[index]
                                                   ? BoxDecoration(
                                                       boxShadow: const [
@@ -178,7 +200,9 @@ class _NewCartPageState extends State<NewCartPage> {
                                               child: UserIconClip(
                                                   iconpath: iconsList[index]),
                                             ),
-                                            cartIconSelected == iconsList[index]
+                                            _newWishlistStore
+                                                        .wishlistIconSelected ==
+                                                    iconsList[index]
                                                 ? const Icon(
                                                     Icons.verified,
                                                     color: Colors.green,
@@ -206,19 +230,6 @@ class _NewCartPageState extends State<NewCartPage> {
     );
   }
 
-  void _createNewCart() async {
-    if (cartName.isEmpty) {
-      setState(() {
-        inputError = true;
-      });
-    } else {
-      final newCart = await dataRepository.createNewCart(
-          Cart(name: cartName, icon: cartIconSelected, userId: user.id));
-
-      goToCartList(newCart);
-    }
-  }
-
-  goToCartList(Cart newCart) => Navigator.pushReplacement(
-      context, MaterialPageRoute(builder: (_) => CartPage(cart: newCart)));
+  backToCartList() => Navigator.pushReplacement(context,
+      MaterialPageRoute(builder: (_) => WishlistListPage(user: widget.user)));
 }
