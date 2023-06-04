@@ -1,22 +1,15 @@
-import 'package:carrinho_de_compra/models/item.dart';
+import 'package:wishlist/models/item.dart';
 
-class Cart {
+class Wishlist {
   int? id;
   String? name;
   String? icon;
   int? userId;
-  List<Item> items;
-  List<int> itemsAmount;
+  List<Item> items = [];
 
-  Cart(
-      {this.id,
-      this.name,
-      this.icon,
-      this.userId,
-      this.items = const [],
-      this.itemsAmount = const []});
+  Wishlist({this.id, this.name, this.icon, this.userId, items = const []});
 
-  factory Cart.fromSQL(Map<String, dynamic> map) => Cart(
+  factory Wishlist.fromSQL(Map<String, dynamic> map) => Wishlist(
       id: map['id'],
       icon: map['icon'],
       name: map['name'],
@@ -30,9 +23,10 @@ class Cart {
   double _getCartAmount() {
     double cartValor = 0.0;
     for (int i = 0; i < items.length; i++) {
-      double valor = items[i].price! * itemsAmount[i];
-      cartValor = cartValor + valor;
+      cartValor = cartValor + items[i].price!;
     }
     return cartValor;
   }
+
+  void setItemsList(List<Item> newItems) {}
 }

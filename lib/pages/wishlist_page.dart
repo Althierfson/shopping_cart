@@ -1,22 +1,22 @@
-import 'package:carrinho_de_compra/models/cart.dart';
-import 'package:carrinho_de_compra/models/item.dart';
-import 'package:carrinho_de_compra/repositories/data_repository.dart';
+import 'package:wishlist/models/item.dart';
+import 'package:wishlist/models/wishlist.dart';
+import 'package:wishlist/repositories/data_repository.dart';
 import 'package:flutter/material.dart';
 
 import '../container.dart';
 import '../widgets/item_tile.dart';
 
-class CartPage extends StatefulWidget {
-  final Cart cart;
-  const CartPage({super.key, required this.cart});
+class WishlistPage extends StatefulWidget {
+  final Wishlist cart;
+  const WishlistPage({super.key, required this.cart});
 
   @override
-  State<CartPage> createState() => _CartPageState();
+  State<WishlistPage> createState() => _WishlistPageState();
 }
 
-class _CartPageState extends State<CartPage> {
-  late DataRepository repository;
-  Cart cart = Cart();
+class _WishlistPageState extends State<WishlistPage> {
+  late Repository repository;
+  Wishlist cart = Wishlist();
   List<Item> items = [];
   bool onCart = false;
 
@@ -29,16 +29,15 @@ class _CartPageState extends State<CartPage> {
   }
 
   getCartItem() async {
-    final newcart = await repository.getCartItem(widget.cart);
     setState(() {
-      cart = newcart;
+      cart = Wishlist();
     });
   }
 
   getAllItems() async {
-    final list = await repository.getAllItems();
+    final list = await repository.fetchItemsWithQuery();
     setState(() {
-      items = list;
+      items = list.sucess ?? [];
     });
   }
 
@@ -76,16 +75,9 @@ class _CartPageState extends State<CartPage> {
     }
     return ListView.builder(
       itemCount: cart.items.length,
-      itemBuilder: (context, index) => GestureDetector(
-        onTap: () {
-          repository.deleteAddOnCart(
-              idItem: cart.items[index].id!,
-              idCart: cart.id!,
-              amount: cart.itemsAmount[index]);
-        },
-        child: ItemTile(
-          item: cart.items[index],
-        ),
+      itemBuilder: (context, index) => ItemTile(
+        item: cart.items[index],
+        onAddBottomTap: (value) {},
       ),
     );
   }
@@ -98,14 +90,9 @@ class _CartPageState extends State<CartPage> {
     }
     return ListView.builder(
       itemCount: items.length,
-      itemBuilder: (context, index) => GestureDetector(
-        onTap: () {
-          repository.addOnCart(
-              idItem: items[index].id!, idCart: cart.id!, amount: 1);
-        },
-        child: ItemTile(
-          item: items[index],
-        ),
+      itemBuilder: (context, index) => ItemTile(
+        item: items[index],
+        onAddBottomTap: (value) {},
       ),
     );
   }
