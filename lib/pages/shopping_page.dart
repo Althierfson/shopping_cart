@@ -23,6 +23,8 @@ class _ShoppingPageState extends State<ShoppingPage> {
   late Wishlist wishlist;
   late List<ReactionDisposer> _disposers;
 
+  int barItemSelected = 0;
+
   @override
   void initState() {
     getDependicies();
@@ -77,11 +79,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
                   SizedBox(
                       width: 50,
                       height: 50,
-                      child: GestureDetector(
-                          onTap: () {
-                            _shoppingStore.goToWishlist();
-                          },
-                          child: UserIconClip(iconpath: wishlist.icon ?? ""))),
+                      child: UserIconClip(iconpath: wishlist.icon ?? "")),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Text(
@@ -147,6 +145,29 @@ class _ShoppingPageState extends State<ShoppingPage> {
             })
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: CColors.blue,
+        selectedItemColor: CColors.white,
+        currentIndex: barItemSelected,
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_bag), label: "shopping"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart), label: "whislist")
+        ],
+        onTap: (value) {
+          setState(() {
+            barItemSelected = value;
+          });
+
+          if (value == 0) {
+            _shoppingStore.goToItemList();
+          }
+          if (value == 1) {
+            _shoppingStore.goToWishlist();
+          }
+        },
       ),
     );
   }

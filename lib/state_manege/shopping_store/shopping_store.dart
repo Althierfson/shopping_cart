@@ -119,4 +119,9 @@ abstract class _ShoppingStore with Store {
         (failure) => snackMsg = failure.toString(),
         (success) => itemList = success));
   }
+
+  @action
+  void goToItemList() {
+    getItems();
+  }
 }
